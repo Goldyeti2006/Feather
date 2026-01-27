@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 3.10)
+project(Feather)
+
+set(CMAKE_CXX_STANDARD 17)
+
+set(ULTRALIGHT_SDK_PATH "$(CMAKE_SOURCE_DIR)")
+
+add_executable(Feather srcs/main.cpp srcs/BrowserApp.cpp)
+target_include_directories(Feather PRIVATE "include"
+"include/Ultralight")
+link_directories("lib")
+
+target_link_libraries(Feather Ultralight UltralightCore AppCore WebCore)
