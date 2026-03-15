@@ -1,0 +1,19 @@
+pub fn performance_flags() -> Vec<&'static str> {
+    vec![
+        "--disable-background-networking",
+        "--disable-sync",
+        "--disable-translate",
+        "--disable-extensions",
+        "--disable-default-apps",
+        "--no-first-run",
+        "--disable-logging",
+        "--process-per-site",
+        "--disable-renderer-backgrounding",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-background-timer-throttling",
+        "--js-flags=--max-old-space-size=128",
+        "--disable-prerender",
+        "--no-pings",
+        "--disable-component-update",
+    ]
+}

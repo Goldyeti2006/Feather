@@ -1,0 +1,25 @@
+[package]
+name = "feather-browser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+env_logger = "0.10"
+winit = "0.29"
+wry = "0.37"
+raw-window-handle = "0.6"
+webview2-com = "0.28"
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+] }
+egui = "0.27"
+egui-winit = "0.27"
+eframe = { version = "0.27", default-features = false, features = ["default_fonts", "glow"] }
+serde_json = "1.0"
+
+[build-dependencies]
+# nothing needed yet, build.rs uses only std library
