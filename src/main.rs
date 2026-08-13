@@ -2,12 +2,13 @@ mod engine;
 mod shell;
 mod platform;
 
+use engine::hibernation::HibernationManager;
+use shell::tabs::TabStore;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
-use shell::tabs::TabStore;
 use wry::WebViewBuilder;
 use std::sync::mpsc;
 // This script is injected into every page that loads
@@ -163,6 +164,12 @@ let tab_store = TabStore::new();
 let first_tab = tab_store.open("https://duckduckgo.com");
 tab_store.set_active(first_tab);
 
+// Set up hibernation manager
+let hibernation = HibernationManager::new(tab_store.clone())
+    .with_threshold(300); // hibernate after 5 min idle
+
+log::info!("Hibernation manager ready (threshold: 300s)");
+
 log::info!(
     "Tab store initialized — {} tab open",
     tab_store.get_all().len()
@@ -215,6 +222,8 @@ let webview = WebViewBuilder::new(&window)
         _ => {}
     }
 
+    let _ = &hibernation;
     let _ = &webview;
+    let _ = &tab_store;
 }).unwrap();
 }

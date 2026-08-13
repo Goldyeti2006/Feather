@@ -74,7 +74,7 @@ impl Tab {
 
 /// Thread-safe store for all open tabs
 pub struct TabStore {
-    tabs: Arc<RwLock<HashMap<u32, Tab>>>,
+    pub tabs: Arc<RwLock<HashMap<u32, Tab>>>,
     /// Which tab is currently active
     active_id: Arc<RwLock<u32>>,
     /// Counter for generating unique tab IDs
