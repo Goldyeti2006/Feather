@@ -1,7 +1,8 @@
 mod engine;
 mod shell;
 mod platform;
-
+use engine::memory::MemoryGovernor;
+use std::sync::Arc;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -25,8 +26,18 @@ const TOOLBAR_SCRIPT: &str = r#"
         const style = document.createElement('style');
         style.id = 'feather-style';
         style.textContent = `
-            html { margin-top: 80px !important; }
+            html {
+                margin-top: 80px !important;
+                visibility: hidden;
+                animation: feather-fadein 0.08s ease forwards;
+            }
+            @keyframes feather-fadein {
+                from { opacity: 0; }
+                to   { opacity: 1; }
+            }
             #feather-root {
+                visibility: visible !important;
+                opacity: 1 !important;
                 position: fixed;
                 top: 0; left: 0; right: 0;
                 height: 80px;
@@ -264,12 +275,15 @@ const TOOLBAR_SCRIPT: &str = r#"
 
         window.renderTabs();
         addr.value = location.href;
+        document.documentElement.style.visibility = 'visible';
+        document.documentElement.style.opacity = '1';
     }
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', inject);
     } else {
         inject();
+        document.addEventListener('DOMContentLoaded', inject);
     }
 })();
 "#;
@@ -308,9 +322,19 @@ fn main() {
     log::info!("Tab store ready — {} tab open", tab_store.get_all().len());
 
     // Set up hibernation manager
-    let hibernation = HibernationManager::new(tab_store.clone())
-        .with_threshold(300);
+    let hibernation = Arc::new(
+        HibernationManager::new(tab_store.clone())
+            .with_threshold(300)
+    );
     log::info!("Hibernation manager ready (threshold: 300s)");
+
+    // Start memory governor on background thread
+    let governor = MemoryGovernor::new(
+        tab_store.clone(),
+        hibernation.clone(),
+    );
+    governor.start();
+    log::info!("Memory governor started (checks every 10s)");
 
     // Create window
     let event_loop = EventLoop::new().unwrap();
