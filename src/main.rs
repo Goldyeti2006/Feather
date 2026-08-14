@@ -13,7 +13,21 @@ use std::sync::mpsc;
 use engine::hibernation::HibernationManager;
 use shell::tabs::{TabStore, TabState};
 
-const TOOLBAR_SCRIPT: &str = r#"
+fn url_sync_script(tab_id: u32) -> String {
+    format!(r#"
+    console.log('script injected for tab', {tab_id});
+    window.addEventListener('load',function() {{
+        console.log('sending url_changed for tab', {tab_id});
+        window.ipc.postMessage(JSON.stringify({{
+         type: 'url_changed',
+         tab_id: {tab_id},
+         url: location.href,
+         title: document.title}}));
+         }});
+          "#)
+}
+
+ const TOOLBAR_SCRIPT: &str = r#"
 (function() {
     window.__feather_tabs = window.__feather_tabs || [
         { id: 1, title: 'New Tab', url: '', active: true, hibernated: false }
