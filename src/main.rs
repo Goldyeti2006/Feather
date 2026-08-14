@@ -361,9 +361,32 @@ fn main() {
 
     // IPC channel — toolbar sends messages here
     let (tx, rx) = mpsc::channel::<String>();
+    
+    // toolbar experiment
+    let webview = WebViewBuilder::new_as_child(&window)
+          .with_html("<h1 style='margin:0;background:#222;color:#fff;'>toolbar</h1>")
+          .with_bounds(wry::Rect {
+        x: 0,
+        y: 0,
+        width: 1280,
+        height: 80,
+       })
+        .build()
+        .unwrap();
+    let webview = WebViewBuilder::new_as_child(&window)
+         .with_url("https://duckduckgo.com")
+         .with_bounds(wry::Rect {
+        x: 0,
+        y: 80,
+        width: 1280,
+        height: 720,
+        })
+         .with_devtools(true)
+         .build()
+         .unwrap();
 
     // Create WebView
-    let webview = WebViewBuilder::new(&window)
+   /*  let webview = WebViewBuilder::new(&window)
         .with_url("https://duckduckgo.com")
         .with_initialization_script(TOOLBAR_SCRIPT)
         .with_devtools(true)
@@ -371,7 +394,7 @@ fn main() {
             let _ = tx.send(msg);
         })
         .build()
-        .unwrap();
+        .unwrap(); */
 
     log::info!("Feather ready");
 
