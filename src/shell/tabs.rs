@@ -46,6 +46,9 @@ pub struct Tab {
     pub memory_kb: u64,
     /// When the user last had this tab active
     pub last_active: Instant,
+    /// navigation
+    pub history: Vec<String>,
+    pub history_index: usize,
 }
 
 impl Tab {
@@ -57,6 +60,8 @@ impl Tab {
             state: TabState::New,
             memory_kb: 0,
             last_active: Instant::now(),
+            history: vec![url.to_string()],
+            history_index: 0,
         }
     }
 
@@ -69,6 +74,24 @@ impl Tab {
     pub fn should_hibernate(&self, idle_threshold_secs: u64) -> bool {
         self.state.is_hibernatable()
             && self.idle_secs() >= idle_threshold_secs
+    }
+    pub fn navigate_to(&mut self, url: &str) {
+         self.history.truncate(self.history_index + 1);
+         self.history.push(url.to_string());
+         self.history_index = self.history.len() - 1;
+         self.url = url.to_string();
+    }
+    pub fn go_back(&mut self) {
+        if self.history_index > 0 {
+            self.history_index -= 1;
+            self.url = self.history[self.history_index].clone();   
+        }
+    }
+    pub fn go_forward(&mut self) {
+        if self.history_index + 1 < self.history.len() {
+            self.history_index += 1;
+         self.url = self.history[self.history_index].clone();
+        }
     }
 }
 
@@ -172,7 +195,7 @@ impl TabStore {
     pub fn set_url(&self, id: u32, url: &str) {
         let mut tabs = self.tabs.write().unwrap();
         if let Some(tab) = tabs.get_mut(&id) {
-            tab.url = url.to_string();
+            tab.navigate_to(url);
         }
     }
 
@@ -200,6 +223,28 @@ impl TabStore {
             .values()
             .filter(|t| t.state.has_renderer())
             .count()
+    }
+    pub fn go_back(&self, id: u32) -> Option<String> {
+    let mut tabs = self.tabs.write().unwrap();
+    if let Some(tab) = tabs.get_mut(&id) {
+        let before = tab.history_index;
+        tab.go_back();
+        if tab.history_index != before {
+             return Some(tab.history[tab.history_index].clone());
+            }
+        }
+        None
+    }
+    pub fn go_forward(&self, id: u32) -> Option<String> {
+    let mut tabs = self.tabs.write().unwrap();
+    if let Some(tab) = tabs.get_mut(&id) {
+        let after = tab.history_index;
+        tab.go_forward();
+        if tab.history_index != after {
+             return Some(tab.history[tab.history_index].clone());
+            }
+        }
+        None
     }
 }
 #[cfg(test)]

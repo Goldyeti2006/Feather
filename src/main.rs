@@ -363,7 +363,7 @@ fn main() {
     let (tx, rx) = mpsc::channel::<String>();
     
     // toolbar experiment
-    let webview = WebViewBuilder::new_as_child(&window)
+    /* let webview = WebViewBuilder::new_as_child(&window)
           .with_html("<h1 style='margin:0;background:#222;color:#fff;'>toolbar</h1>")
           .with_bounds(wry::Rect {
         x: 0,
@@ -383,10 +383,10 @@ fn main() {
         })
          .with_devtools(true)
          .build()
-         .unwrap();
+         .unwrap(); */
 
     // Create WebView
-   /*  let webview = WebViewBuilder::new(&window)
+    let webview = WebViewBuilder::new(&window)
         .with_url("https://duckduckgo.com")
         .with_initialization_script(TOOLBAR_SCRIPT)
         .with_devtools(true)
@@ -394,7 +394,7 @@ fn main() {
             let _ = tx.send(msg);
         })
         .build()
-        .unwrap(); */
+        .unwrap();
 
     log::info!("Feather ready");
 
@@ -457,10 +457,28 @@ fn main() {
                         sync_tabs_to_js(&webview, &tab_store)
                     }
                     Some("back") => {
-                        let _ = webview.evaluate_script("window.history.go(-1)");
+                        let active = tab_store.active_id();
+                        log::info!("back pressed, active tab: {}", active);
+                        if let Some(new_url) = tab_store.go_back(active) {
+                            log::info!("go_back returned url: {}", new_url);
+                            let _ = webview.load_url(&new_url);
+                            sync_tabs_to_js(&webview, &tab_store);
+                        }
+                        else{
+                             log::info!("go_back returned None");
+                        }
                     }
                     Some("forward") => {
-                        let _ = webview.evaluate_script("window.history.go(1)");
+                        let active = tab_store.active_id();
+                        log::info!("forward pressed, active tab: {}", active);
+                        if let Some(new_url) = tab_store.go_forward(active) {
+                            log::info!("go_forward returned url: {}", new_url);
+                            let _ = webview.load_url(&new_url);
+                            sync_tabs_to_js(&webview, &tab_store);
+                        }
+                        else{
+                            log::info!("go_forward returned None");
+                        }
                     }
                     Some("reload") => {
                         let _ = webview.evaluate_script("location.reload()");
