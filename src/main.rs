@@ -27,7 +27,7 @@ fn url_sync_script(tab_id: u32) -> String {
           "#)
 }
 
- const TOOLBAR_SCRIPT: &str = r#"
+ /* const TOOLBAR_SCRIPT: &str = r#"
 (function() {
     window.__feather_tabs = window.__feather_tabs || [
         { id: 1, title: 'New Tab', url: '', active: true, hibernated: false }
@@ -301,12 +301,150 @@ fn url_sync_script(tab_id: u32) -> String {
     }
 })();
 "#;
+ */
+ const TOOLBAR_HTML: &str = r#"
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #1a1a1a; }
+    #feather-tabbar {
+        height: 32px; background: #111; display: flex; align-items: center;
+        padding: 0 4px; gap: 2px; overflow-x: auto; scrollbar-width: none;
+    }
+    #feather-tabbar::-webkit-scrollbar { display: none; }
+    .f-tab {
+        height: 26px; max-width: 180px; min-width: 80px; background: #1e1e1e;
+        border-radius: 6px 6px 0 0; display: flex; align-items: center; padding: 0 8px;
+        gap: 6px; cursor: pointer; flex-shrink: 0; transition: background 0.1s;
+        border: 1px solid #2a2a2a; border-bottom: none;
+    }
+    .f-tab:hover { background: #2a2a2a; }
+    .f-tab.active { background: #1a1a1a; border-color: #333; }
+    .f-tab-title { flex: 1; font-size: 11px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .f-tab.active .f-tab-title { color: #fff; }
+    .f-tab-close { font-size: 12px; color: #555; cursor: pointer; padding: 0 2px; border-radius: 3px; flex-shrink: 0; }
+    .f-tab-close:hover { color: #fff; background: #444; }
+    .f-tab-hibernated { opacity: 0.6; }
+    #f-newtab {
+        height: 26px; width: 26px; background: transparent; border: none; color: #888;
+        font-size: 18px; cursor: pointer; border-radius: 4px; display: flex;
+        align-items: center; justify-content: center; flex-shrink: 0; margin-left: 2px;
+    }
+    #f-newtab:hover { background: #2a2a2a; color: #fff; }
+    #feather-toolbar {
+        height: 48px; background: #1a1a1a; display: flex; align-items: center;
+        padding: 0 8px; gap: 4px; border-bottom: 1px solid #2a2a2a; box-sizing: border-box;
+    }
+    #feather-toolbar button {
+        background: transparent; border: none; color: #fff; font-size: 18px;
+        width: 34px; height: 34px; border-radius: 6px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: background 0.1s; flex-shrink: 0;
+    }
+    #feather-toolbar button:hover { background: #2e2e2e; }
+    #feather-toolbar button:disabled { color: #444; cursor: default; }
+    #feather-toolbar button:disabled:hover { background: transparent; }
+    #feather-addr {
+        flex: 1; height: 34px; background: #2a2a2a; border: 1.5px solid #333;
+        border-radius: 8px; color: #f0f0f0; font-size: 13px; padding: 0 14px;
+        outline: none; transition: border-color 0.15s;
+    }
+    #feather-addr:focus { border-color: #4a9eff; background: #222; }
+    #feather-addr::placeholder { color: #555; }
+</style>
+</head>
+<body>
+    <div id="feather-tabbar">
+        <button id="f-newtab" title="New Tab">+</button>
+    </div>
+    <div id="feather-toolbar">
+        <button id="f-back" disabled>&#8592;</button>
+        <button id="f-fwd" disabled>&#8594;</button>
+        <button id="f-reload">&#8635;</button>
+        <input id="feather-addr" type="text" placeholder="Search or enter address..." spellcheck="false" autocomplete="off" />
+    </div>
 
-fn sync_tabs_to_js(
-    webview: &wry::WebView,
-    tab_store: &TabStore,
-) {
-   let tabs = tab_store.get_all();
+<script>
+    window.__feather_tabs = [];
+    window.__feather_active_tab = null;
+
+    const addr      = document.getElementById('feather-addr');
+    const backBtn   = document.getElementById('f-back');
+    const fwdBtn    = document.getElementById('f-fwd');
+    const reloadBtn = document.getElementById('f-reload');
+    const tabbar    = document.getElementById('feather-tabbar');
+    const newTabBtn = document.getElementById('f-newtab');
+
+    function renderTabs() {
+        tabbar.querySelectorAll('.f-tab').forEach(t => t.remove());
+        window.__feather_tabs.forEach(tab => {
+            const el = document.createElement('div');
+            el.className = 'f-tab' + (tab.active ? ' active' : '') + (tab.hibernated ? ' f-tab-hibernated' : '');
+            el.dataset.id = tab.id;
+            el.innerHTML = `<span class="f-tab-title">${tab.hibernated ? '💤 ' : ''}${tab.title}</span><span class="f-tab-close" data-id="${tab.id}">×</span>`;
+            el.addEventListener('click', (e) => {
+                if (e.target.classList.contains('f-tab-close')) return;
+                window.ipc.postMessage(JSON.stringify({ type: 'switch_tab', id: tab.id }));
+            });
+            el.querySelector('.f-tab-close').addEventListener('click', () => {
+                window.ipc.postMessage(JSON.stringify({ type: 'close_tab', id: tab.id }));
+            });
+            tabbar.insertBefore(el, newTabBtn);
+        });
+    }
+
+    newTabBtn.addEventListener('click', () => {
+        window.ipc.postMessage(JSON.stringify({ type: 'new_tab' }));
+    });
+
+    function resolveInput(input) {
+        if (input.startsWith('http://') || input.startsWith('https://')) return input;
+        if (input.includes('.') && !input.includes(' ')) return 'https://' + input;
+        return 'https://duckduckgo.com/?q=' + encodeURIComponent(input);
+    }
+
+    addr.addEventListener('focus', () => addr.select());
+    addr.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            const url = resolveInput(addr.value.trim());
+            window.ipc.postMessage(JSON.stringify({ type: 'navigate', url }));
+            addr.blur();
+        }
+    });
+
+    backBtn.addEventListener('click', () => {
+    console.log('back button clicked');
+    window.ipc.postMessage(JSON.stringify({ type: 'back' }))
+    });
+    fwdBtn.addEventListener('click', () => {
+    console.log('forward button clicked');
+    window.ipc.postMessage(JSON.stringify({ type: 'forward' }))});
+    reloadBtn.addEventListener('click', () => {
+    console.log('reload button clicked');
+    window.ipc.postMessage(JSON.stringify({ type: 'reload' }))});
+
+    // Called from Rust
+    window.updateTabs = function(tabs, activeId) {
+        window.__feather_tabs = tabs;
+        window.__feather_active_tab = activeId;
+        renderTabs();
+    };
+
+    window.updateAddress = function(url) {
+        addr.value = url;
+    };
+
+    window.updateNavButtons = function(canBack, canForward) {
+        backBtn.disabled = !canBack;
+        fwdBtn.disabled = !canForward;
+    };
+</script>
+</body>
+</html>
+"#;
+fn sync_tabs_to_js(webview: &wry::WebView, tab_store: &TabStore) {
+    let tabs = tab_store.get_all();
     let active_id = tab_store.active_id();
     let tabs_json = serde_json::json!(
         tabs.iter().map(|t| serde_json::json!({
@@ -319,6 +457,10 @@ fn sync_tabs_to_js(
     );
     let script = format!("window.updateTabs({}, {})", tabs_json, active_id);
     let _ = webview.evaluate_script(&script);
+
+    let (can_back, can_forward) = tab_store.nav_state(active_id);
+    let nav_script = format!("window.updateNavButtons({}, {})", can_back, can_forward);
+    let _ = webview.evaluate_script(&nav_script);
 }
 
 fn main() {
@@ -360,33 +502,41 @@ fn main() {
         .unwrap();
 
     // IPC channel — toolbar sends messages here
-    let (tx, rx) = mpsc::channel::<String>();
+    let (toolbar_tx, toolbar_rx) = mpsc::channel::<String>();
+    let (content_tx, content_rx) = mpsc::channel::<String>();
     
     // toolbar experiment
-    /* let webview = WebViewBuilder::new_as_child(&window)
-          .with_html("<h1 style='margin:0;background:#222;color:#fff;'>toolbar</h1>")
-          .with_bounds(wry::Rect {
-        x: 0,
-        y: 0,
-        width: 1280,
-        height: 80,
-       })
-        .build()
-        .unwrap();
-    let webview = WebViewBuilder::new_as_child(&window)
-         .with_url("https://duckduckgo.com")
-         .with_bounds(wry::Rect {
-        x: 0,
-        y: 80,
-        width: 1280,
-        height: 720,
-        })
-         .with_devtools(true)
-         .build()
-         .unwrap(); */
+    let toolbar_webview = WebViewBuilder::new_as_child(&window)
+    .with_devtools(true)
+    .with_html(TOOLBAR_HTML)
+    .with_bounds(wry::Rect { x: 0, y: 0, width: 1280, height: 80 })
+    .with_ipc_handler(move |msg| {
+        let _ = toolbar_tx.send(msg);
+    })
+    .build()
+    .unwrap();
 
+    // Content WebViews — one per tab
+    let mut content_webviews: std::collections::HashMap<u32, wry::WebView> = std::collections::HashMap::new();
+
+    // Create the first tab's WebView (matches first_tab opened earlier)
+    {
+        let tx = content_tx.clone();
+        let id = first_tab;
+        let wv = WebViewBuilder::new_as_child(&window)
+            .with_url("https://duckduckgo.com")
+            .with_bounds(wry::Rect { x: 0, y: 80, width: 1280, height: 720 })
+            .with_initialization_script(&url_sync_script(id))
+            .with_ipc_handler(move |msg| {
+                let _ = tx.send(msg);
+            })
+            .build()
+            .unwrap();
+        content_webviews.insert(id, wv);
+    }
+    sync_tabs_to_js(&toolbar_webview, &tab_store);
     // Create WebView
-    let webview = WebViewBuilder::new(&window)
+    /* let webview = WebViewBuilder::new(&window)
         .with_url("https://duckduckgo.com")
         .with_initialization_script(TOOLBAR_SCRIPT)
         .with_devtools(true)
@@ -394,114 +544,133 @@ fn main() {
             let _ = tx.send(msg);
         })
         .build()
-        .unwrap();
+        .unwrap(); */
 
     log::info!("Feather ready");
 
     // Run event loop
     event_loop.run(move |event, elwt| {
-        elwt.set_control_flow(ControlFlow::Poll);
+    elwt.set_control_flow(ControlFlow::Poll);
 
-        // Handle IPC messages from toolbar
-        if let Ok(msg) = rx.try_recv() {
+    // --- Toolbar IPC: navigate, back, forward, reload, new_tab, close_tab, switch_tab ---
+        if let Ok(msg) = toolbar_rx.try_recv() {
+            log::info!("RAW toolbar message: {}", msg);
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&msg) {
                 match val["type"].as_str() {
                     Some("navigate") => {
                         let url = val["url"].as_str().unwrap_or("").to_string();
-                        log::info!("Navigate: {}", url);
-                        let _ = webview.load_url(&url);
-                        // Update active tab URL in store
                         let active = tab_store.active_id();
-                        tab_store.set_url(active, &url);
-                        sync_tabs_to_js(&webview, &tab_store);
+                        if let Some(wv) = content_webviews.get(&active) {
+                            let _ = wv.load_url(&url);
+                        }
                     }
                     Some("new_tab") => {
                         let id = tab_store.open("https://duckduckgo.com");
                         tab_store.set_active(id);
-                        let _ = webview.load_url("https://duckduckgo.com");
-                        log::info!("New tab: {}", id);
-                        sync_tabs_to_js(&webview, &tab_store);
+
+                        // hide all other content webviews
+                        for (tab_id, wv) in content_webviews.iter() {
+                            let _ = wv.set_visible(*tab_id == id);
+                        }
+
+                        let tx = content_tx.clone();
+                        let wv = WebViewBuilder::new_as_child(&window)
+                            .with_url("https://duckduckgo.com")
+                            .with_bounds(wry::Rect { x: 0, y: 80, width: 1280, height: 720 })
+                            .with_initialization_script(&url_sync_script(id))
+                            .with_ipc_handler(move |msg| {
+                                let _ = tx.send(msg);
+                            })
+                            .build()
+                            .unwrap();
+                        content_webviews.insert(id, wv);
+
+                        sync_tabs_to_js(&toolbar_webview, &tab_store);
                     }
                     Some("close_tab") => {
                         if let Some(id) = val["id"].as_u64() {
-                            tab_store.close(id as u32);
-                            log::info!("Closed tab: {}", id);
-                            sync_tabs_to_js(&webview, &tab_store);
+                            let id = id as u32;
+                            tab_store.close(id);
+                            content_webviews.remove(&id);
+                            sync_tabs_to_js(&toolbar_webview, &tab_store);
                         }
                     }
                     Some("switch_tab") => {
                         if let Some(id) = val["id"].as_u64() {
                             let id = id as u32;
-                            let tabs = tab_store.get_all();
-                            if let Some(tab) = tabs.iter().find(|t| t.id == id) {
-                                if tab.state == TabState::Hibernated {
-                                    if let Some(url) = hibernation.wake(id) {
-                                        tab_store.set_active(id);
-                                        let _ = webview.load_url(&url);
-                                        log::info!("Woke tab {}", id);
-                                    }
-                                } else {
-                                    tab_store.set_active(id);
-                                    let _ = webview.load_url(&tab.url);
-                                }
+                            tab_store.set_active(id);
+                            for (tab_id, wv) in content_webviews.iter() {
+                                let _ = wv.set_visible(*tab_id == id);
                             }
-                            sync_tabs_to_js(&webview, &tab_store);
+                            sync_tabs_to_js(&toolbar_webview, &tab_store);
                         }
-                    }
-                    Some("url_changed") => {
-                        let url = val["url"].as_str().unwrap_or("").to_string();
-                        let title = val["title"].as_str().unwrap_or("New Tab").to_string();
-                        let active = tab_store.active_id();
-                        tab_store.set_url(active, &url);
-                        tab_store.set_title(active, &title);
-                        sync_tabs_to_js(&webview, &tab_store)
                     }
                     Some("back") => {
                         let active = tab_store.active_id();
-                        log::info!("back pressed, active tab: {}", active);
                         if let Some(new_url) = tab_store.go_back(active) {
-                            log::info!("go_back returned url: {}", new_url);
-                            let _ = webview.load_url(&new_url);
-                            sync_tabs_to_js(&webview, &tab_store);
-                        }
-                        else{
-                             log::info!("go_back returned None");
+                            tab_store.set_suppress(active, true);
+                            if let Some(wv) = content_webviews.get(&active) {
+                                let _ = wv.load_url(&new_url);
+                            }
+                            sync_tabs_to_js(&toolbar_webview, &tab_store);
                         }
                     }
                     Some("forward") => {
                         let active = tab_store.active_id();
-                        log::info!("forward pressed, active tab: {}", active);
                         if let Some(new_url) = tab_store.go_forward(active) {
-                            log::info!("go_forward returned url: {}", new_url);
-                            let _ = webview.load_url(&new_url);
-                            sync_tabs_to_js(&webview, &tab_store);
-                        }
-                        else{
-                            log::info!("go_forward returned None");
+                            tab_store.set_suppress(active, true);
+                            if let Some(wv) = content_webviews.get(&active) {
+                                let _ = wv.load_url(&new_url);
+                            }
+                            sync_tabs_to_js(&toolbar_webview, &tab_store);
                         }
                     }
                     Some("reload") => {
-                        let _ = webview.evaluate_script("location.reload()");
+                        let active = tab_store.active_id();
+                        tab_store.set_suppress(active, true);
+                        if let Some(wv) = content_webviews.get(&active) {
+                            let _ = wv.evaluate_script("location.reload()");
+                        }
                     }
                     _ => {}
                 }
             }
         }
 
-        // Handle window events
+        // --- Content IPC: url_changed (from whichever tab's WebView sent it) ---
+        if let Ok(msg) = content_rx.try_recv() {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&msg) {
+                if val["type"].as_str() == Some("url_changed") {
+                    if let Some(tab_id) = val["tab_id"].as_u64() {
+                        let tab_id = tab_id as u32;
+                        let url = val["url"].as_str().unwrap_or("").to_string();
+                        let title = val["title"].as_str().unwrap_or("New Tab").to_string();
+
+                        if tab_store.take_suppress(tab_id) {
+                            // this load was caused by back/forward/reload — don't push new history
+                            tab_store.set_title(tab_id, &title);
+                        } else {
+                            tab_store.set_url(tab_id, &url);
+                            tab_store.set_title(tab_id, &title);
+                        }
+
+                        if tab_id == tab_store.active_id() {
+                            let script = format!("window.updateAddress('{}')", url);
+                            let _ = toolbar_webview.evaluate_script(&script);
+                        }
+                        sync_tabs_to_js(&toolbar_webview, &tab_store);
+                    }
+                }
+            }
+        }
+
         match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested, ..
-            } => {
-                log::info!("Shutting down Feather");
+            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 elwt.exit();
             }
             _ => {}
         }
 
-        // Keep everything alive
-        let _ = &webview;
-        let _ = &tab_store;
         let _ = &hibernation;
     }).unwrap();
 }

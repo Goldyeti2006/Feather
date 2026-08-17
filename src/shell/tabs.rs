@@ -35,6 +35,7 @@ impl TabState {
 #[derive(Debug, Clone)]
 pub struct Tab {
     /// Unique ID for this tab
+    pub suppress_next_push: bool,
     pub id: u32,
     /// Current URL
     pub url: String,
@@ -54,6 +55,7 @@ pub struct Tab {
 impl Tab {
     pub fn new(id: u32, url: &str) -> Self {
         Self {
+            suppress_next_push: false,
             id,
             url: url.to_string(),
             title: "New Tab".to_string(),
@@ -245,6 +247,32 @@ impl TabStore {
             }
         }
         None
+    }
+    pub fn nav_state(&self, id: u32) -> (bool, bool) {
+    let tabs = self.tabs.read().unwrap();
+    if let Some(tab) = tabs.get(&id) {
+        let can_back = tab.history_index > 0;
+        let can_forward = tab.history_index + 1 < tab.history.len();
+        (can_back, can_forward)
+        } else {
+            (false, false)
+        }
+    }
+    pub fn set_suppress(&self, id: u32, value: bool) {
+    let mut tabs = self.tabs.write().unwrap();
+    if let Some(tab) = tabs.get_mut(&id) {
+        tab.suppress_next_push = value;
+    }
+    }
+    pub fn take_suppress(&self, id: u32) -> bool {
+    let mut tabs = self.tabs.write().unwrap();
+    if let Some(tab) = tabs.get_mut(&id) {
+        let val = tab.suppress_next_push;
+        tab.suppress_next_push = false;
+        val
+    } else {
+        false
+    }
     }
 }
 #[cfg(test)]
