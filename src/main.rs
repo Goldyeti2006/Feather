@@ -15,16 +15,28 @@ use shell::tabs::{TabStore, TabState};
 
 fn url_sync_script(tab_id: u32) -> String {
     format!(r#"
-    console.log('script injected for tab', {tab_id});
-    window.addEventListener('load',function() {{
-        console.log('sending url_changed for tab', {tab_id});
-        window.ipc.postMessage(JSON.stringify({{
-         type: 'url_changed',
-         tab_id: {tab_id},
-         url: location.href,
-         title: document.title}}));
-         }});
-          "#)
+    (function() {{
+        let lastUrl = location.href;
+
+        function onUrlChange() {{
+            window.ipc.postMessage(JSON.stringify({{
+                type: 'url_changed',
+                tab_id: {tab_id},
+                url: location.href,
+                title: document.title
+            }}));
+        }}
+
+        window.addEventListener('load', onUrlChange);
+
+        setInterval(function() {{
+            if (location.href !== lastUrl) {{
+                lastUrl = location.href;
+                onUrlChange();
+            }}
+        }}, 500);
+    }})();
+    "#)
 }
 
  /* const TOOLBAR_SCRIPT: &str = r#"
@@ -563,6 +575,7 @@ fn main() {
                         if let Some(wv) = content_webviews.get(&active) {
                             let _ = wv.load_url(&url);
                         }
+                        sync_tabs_to_js(&toolbar_webview, &tab_store);
                     }
                     Some("new_tab") => {
                         let id = tab_store.open("https://duckduckgo.com");
@@ -639,6 +652,7 @@ fn main() {
 
         // --- Content IPC: url_changed (from whichever tab's WebView sent it) ---
         if let Ok(msg) = content_rx.try_recv() {
+             log::info!("RAW content message: {}", msg);
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&msg) {
                 if val["type"].as_str() == Some("url_changed") {
                     if let Some(tab_id) = val["tab_id"].as_u64() {

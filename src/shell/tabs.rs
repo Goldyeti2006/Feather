@@ -78,6 +78,9 @@ impl Tab {
             && self.idle_secs() >= idle_threshold_secs
     }
     pub fn navigate_to(&mut self, url: &str) {
+        if self.url == url {
+        return; 
+    }
          self.history.truncate(self.history_index + 1);
          self.history.push(url.to_string());
          self.history_index = self.history.len() - 1;
