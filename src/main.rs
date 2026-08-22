@@ -3,7 +3,7 @@ mod shell;
 mod platform;
 use engine::memory::MemoryGovernor;
 use std::sync::Arc;
-use winit::{
+use winit::{      
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
@@ -12,7 +12,6 @@ use wry::WebViewBuilder;
 use std::sync::mpsc;
 use engine::hibernation::HibernationManager;
 use shell::tabs::{TabStore, TabState};
-
 fn url_sync_script(tab_id: u32) -> String {
     format!(r#"
     (function() {{
@@ -39,281 +38,6 @@ fn url_sync_script(tab_id: u32) -> String {
     "#)
 }
 
- /* const TOOLBAR_SCRIPT: &str = r#"
-(function() {
-    window.__feather_tabs = window.__feather_tabs || [
-        { id: 1, title: 'New Tab', url: '', active: true, hibernated: false }
-    ];
-    window.__feather_active_tab = window.__feather_active_tab || 1;
-
-    function inject() {
-        if (document.getElementById('feather-root')) return;
-
-        const style = document.createElement('style');
-        style.id = 'feather-style';
-        style.textContent = `
-            html {
-                margin-top: 80px !important;
-                visibility: hidden;
-                animation: feather-fadein 0.08s ease forwards;
-            }
-            @keyframes feather-fadein {
-                from { opacity: 0; }
-                to   { opacity: 1; }
-            }
-            #feather-root {
-                visibility: visible !important;
-                opacity: 1 !important;
-                position: fixed;
-                top: 0; left: 0; right: 0;
-                height: 80px;
-                z-index: 2147483647;
-                font-family: -apple-system, system-ui, sans-serif;
-                display: flex;
-                flex-direction: column;
-            }
-            #feather-tabbar {
-                height: 32px;
-                background: #111;
-                display: flex;
-                align-items: center;
-                padding: 0 4px;
-                gap: 2px;
-                overflow-x: auto;
-                scrollbar-width: none;
-            }
-            #feather-tabbar::-webkit-scrollbar { display: none; }
-            .f-tab {
-                height: 26px;
-                max-width: 180px;
-                min-width: 80px;
-                background: #1e1e1e;
-                border-radius: 6px 6px 0 0;
-                display: flex;
-                align-items: center;
-                padding: 0 8px;
-                gap: 6px;
-                cursor: pointer;
-                flex-shrink: 0;
-                transition: background 0.1s;
-                border: 1px solid #2a2a2a;
-                border-bottom: none;
-            }
-            .f-tab:hover { background: #2a2a2a; }
-            .f-tab.active { background: #1a1a1a; border-color: #333; }
-            .f-tab-title {
-                flex: 1;
-                font-size: 11px;
-                color: #ccc;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            .f-tab.active .f-tab-title { color: #fff; }
-            .f-tab-close {
-                font-size: 12px;
-                color: #555;
-                cursor: pointer;
-                padding: 0 2px;
-                border-radius: 3px;
-                flex-shrink: 0;
-            }
-            .f-tab-close:hover { color: #fff; background: #444; }
-            .f-tab-hibernated { opacity: 0.6; }
-            #f-newtab {
-                height: 26px;
-                width: 26px;
-                background: transparent;
-                border: none;
-                color: #888;
-                font-size: 18px;
-                cursor: pointer;
-                border-radius: 4px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                margin-left: 2px;
-            }
-            #f-newtab:hover { background: #2a2a2a; color: #fff; }
-            #feather-toolbar {
-                height: 48px;
-                background: #1a1a1a;
-                display: flex;
-                align-items: center;
-                padding: 0 8px;
-                gap: 4px;
-                border-bottom: 1px solid #2a2a2a;
-                box-sizing: border-box;
-            }
-            #feather-toolbar button {
-                background: transparent;
-                border: none;
-                color: #fff;
-                font-size: 18px;
-                width: 34px;
-                height: 34px;
-                border-radius: 6px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.1s;
-                flex-shrink: 0;
-            }
-            #feather-toolbar button:hover { background: #2e2e2e; }
-            #feather-toolbar button:disabled { color: #444; cursor: default; }
-            #feather-toolbar button:disabled:hover { background: transparent; }
-            #feather-addr {
-                flex: 1;
-                height: 34px;
-                background: #2a2a2a;
-                border: 1.5px solid #333;
-                border-radius: 8px;
-                color: #f0f0f0;
-                font-size: 13px;
-                padding: 0 14px;
-                outline: none;
-                transition: border-color 0.15s;
-            }
-            #feather-addr:focus { border-color: #4a9eff; background: #222; }
-            #feather-addr::placeholder { color: #555; }
-        `;
-        document.documentElement.appendChild(style);
-
-        const root = document.createElement('div');
-        root.id = 'feather-root';
-        root.innerHTML = `
-            <div id="feather-tabbar">
-                <button id="f-newtab" title="New Tab">+</button>
-            </div>
-            <div id="feather-toolbar">
-                <button id="f-back" disabled>&#8592;</button>
-                <button id="f-fwd"  disabled>&#8594;</button>
-                <button id="f-reload">&#8635;</button>
-                <input
-                    id="feather-addr"
-                    type="text"
-                    placeholder="Search or enter address..."
-                    spellcheck="false"
-                    autocomplete="off"
-                />
-            </div>
-        `;
-        document.documentElement.appendChild(root);
-
-        const addr      = document.getElementById('feather-addr');
-        const backBtn   = document.getElementById('f-back');
-        const fwdBtn    = document.getElementById('f-fwd');
-        const reloadBtn = document.getElementById('f-reload');
-        const tabbar    = document.getElementById('feather-tabbar');
-        const newTabBtn = document.getElementById('f-newtab');
-
-        window.renderTabs = function() {
-            tabbar.querySelectorAll('.f-tab').forEach(t => t.remove());
-            window.__feather_tabs.forEach(tab => {
-                const el = document.createElement('div');
-                el.className = 'f-tab' +
-                    (tab.active ? ' active' : '') +
-                    (tab.hibernated ? ' f-tab-hibernated' : '');
-                el.dataset.id = tab.id;
-                el.innerHTML = `
-                    <span class="f-tab-title">
-                        ${tab.hibernated ? '💤 ' : ''}${tab.title}
-                    </span>
-                    <span class="f-tab-close" data-id="${tab.id}">×</span>
-                `;
-                el.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('f-tab-close')) return;
-                    window.ipc.postMessage(JSON.stringify({
-                        type: 'switch_tab', id: tab.id
-                    }));
-                });
-                el.querySelector('.f-tab-close').addEventListener('click', () => {
-                    window.ipc.postMessage(JSON.stringify({
-                        type: 'close_tab', id: tab.id
-                    }));
-                });
-                tabbar.insertBefore(el, newTabBtn);
-            });
-        };
-
-        newTabBtn.addEventListener('click', () => {
-            window.ipc.postMessage(JSON.stringify({ type: 'new_tab' }));
-        });
-
-        addr.addEventListener('focus', () => addr.select());
-        addr.addEventListener('keydown', e => {
-            if (e.key === 'Enter') {
-                const url = resolveInput(addr.value.trim());
-                addr.value = url;
-                window.ipc.postMessage(JSON.stringify({ type: 'navigate', url }));
-                addr.blur();
-            }
-            if (e.key === 'Escape') {
-                addr.value = location.href;
-                addr.blur();
-            }
-        });
-
-        backBtn.addEventListener('click', () => {
-            window.ipc.postMessage(JSON.stringify({ type: 'back' }));
-        });
-        fwdBtn.addEventListener('click', () => {
-            window.ipc.postMessage(JSON.stringify({ type: 'forward' }));
-        });
-        reloadBtn.addEventListener('click', () => {
-            window.ipc.postMessage(JSON.stringify({ type: 'reload' }));
-        });
-
-        function updateNav() {
-            backBtn.disabled = (history.length <= 1);
-            fwdBtn.disabled = false;
-            addr.value = location.href;
-            const activeTab = window.__feather_tabs.find(t => t.active);
-            if (activeTab) {
-                activeTab.url = location.href;
-                activeTab.title = document.title || location.hostname;
-                window.renderTabs();
-            }
-            // Tell Rust the current URL so tab store stays in sync
-            window.ipc.postMessage(JSON.stringify({
-                type: 'url_changed',
-                url: location.href,
-                title: document.title || location.hostname
-            }));
-        }
-
-        function resolveInput(input) {
-            if (input.startsWith('http://') || input.startsWith('https://')) return input;
-            if (input.includes('.') && !input.includes(' ')) return 'https://' + input;
-            return 'https://duckduckgo.com/?q=' + encodeURIComponent(input);
-        }
-
-        window.addEventListener('load', updateNav);
-        window.addEventListener('popstate', updateNav);
-
-        window.updateTabs = function(tabs, activeId) {
-            window.__feather_tabs = tabs;
-            window.__feather_active_tab = activeId;
-            window.renderTabs();
-        };
-
-        window.renderTabs();
-        addr.value = location.href;
-        document.documentElement.style.visibility = 'visible';
-        document.documentElement.style.opacity = '1';
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', inject);
-    } else {
-        inject();
-        document.addEventListener('DOMContentLoaded', inject);
-    }
-})();
-"#;
- */
  const TOOLBAR_HTML: &str = r#"
 <!DOCTYPE html>
 <html>
@@ -474,7 +198,20 @@ fn sync_tabs_to_js(webview: &wry::WebView, tab_store: &TabStore) {
     let nav_script = format!("window.updateNavButtons({}, {})", can_back, can_forward);
     let _ = webview.evaluate_script(&nav_script);
 }
+fn resize_webviews(toolbar: &wry::WebView,
+    content: &std::collections::HashMap<u32, wry::WebView>,
+    width: u32,
+    height: u32,){
+    let _ = toolbar.set_bounds(wry::Rect {
+        x: 0, y: 0, width, height: 80,
+    });
 
+    for wv in content.values() {
+        let _ = wv.set_bounds(wry::Rect {
+            x: 0, y: 80, width, height: height.saturating_sub(80),
+        });
+    }
+}
 fn main() {
     env_logger::init();
     log::info!("Feather starting...");
@@ -512,6 +249,11 @@ fn main() {
         .with_min_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
         .build(&event_loop)
         .unwrap();
+    
+    
+    // NEW: track content-area size (window size minus toolbar height)
+    let inner = window.inner_size(); // PhysicalSize<u32>
+    let mut window_size: (u32, u32) = (inner.width, inner.height);
 
     // IPC channel — toolbar sends messages here
     let (toolbar_tx, toolbar_rx) = mpsc::channel::<String>();
@@ -537,7 +279,7 @@ fn main() {
         let id = first_tab;
         let wv = WebViewBuilder::new_as_child(&window)
             .with_url("https://duckduckgo.com")
-            .with_bounds(wry::Rect { x: 0, y: 80, width: 1280, height: 720 })
+            .with_bounds(wry::Rect { x: 0, y: 80, width: 1200, height: 720 })
             .with_initialization_script(&url_sync_script(id))
             .with_ipc_handler(move |msg| {
                 let _ = tx.send(msg);
@@ -547,16 +289,6 @@ fn main() {
         content_webviews.insert(id, wv);
     }
     sync_tabs_to_js(&toolbar_webview, &tab_store);
-    // Create WebView
-    /* let webview = WebViewBuilder::new(&window)
-        .with_url("https://duckduckgo.com")
-        .with_initialization_script(TOOLBAR_SCRIPT)
-        .with_devtools(true)
-        .with_ipc_handler(move |msg| {
-            let _ = tx.send(msg);
-        })
-        .build()
-        .unwrap(); */
 
     log::info!("Feather ready");
 
@@ -589,7 +321,7 @@ fn main() {
                         let tx = content_tx.clone();
                         let wv = WebViewBuilder::new_as_child(&window)
                             .with_url("https://duckduckgo.com")
-                            .with_bounds(wry::Rect { x: 0, y: 80, width: 1280, height: 720 })
+                            .with_bounds(wry::Rect { x: 0, y: 80, width: window_size.0, height: window_size.1.saturating_sub(80) })
                             .with_initialization_script(&url_sync_script(id))
                             .with_ipc_handler(move |msg| {
                                 let _ = tx.send(msg);
@@ -681,6 +413,10 @@ fn main() {
         match event {
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 elwt.exit();
+            }
+            Event::WindowEvent { event: WindowEvent::Resized(physical_size), .. } => {
+                window_size = (physical_size.width, physical_size.height);
+                resize_webviews(&toolbar_webview, &content_webviews, window_size.0, window_size.1);
             }
             _ => {}
         }
