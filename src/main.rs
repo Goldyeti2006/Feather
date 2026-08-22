@@ -12,6 +12,7 @@ use wry::WebViewBuilder;
 use std::sync::mpsc;
 use engine::hibernation::HibernationManager;
 use shell::tabs::{TabStore, TabState};
+
 fn url_sync_script(tab_id: u32) -> String {
     format!(r#"
     (function() {{
@@ -212,6 +213,13 @@ fn resize_webviews(toolbar: &wry::WebView,
         });
     }
 }
+
+fn load_icon(path: &str) -> winit::window::Icon {
+    let img = image::open(path).expect("failed to load icon").into_rgba8();
+    let (width, height) = img.dimensions();
+    winit::window::Icon::from_rgba(img.into_raw(), width, height)
+        .expect("failed to create icon")
+}
 fn main() {
     env_logger::init();
     log::info!("Feather starting...");
@@ -243,8 +251,10 @@ fn main() {
 
     // Create window
     let event_loop = EventLoop::new().unwrap();
+    let icon = load_icon("assets/feather.ico");
     let window = WindowBuilder::new()
         .with_title("Feather")
+        .with_window_icon(Some(icon))
         .with_inner_size(winit::dpi::LogicalSize::new(1280.0, 800.0))
         .with_min_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
         .build(&event_loop)
@@ -403,6 +413,7 @@ fn main() {
                         if tab_id == tab_store.active_id() {
                             let script = format!("window.updateAddress('{}')", url);
                             let _ = toolbar_webview.evaluate_script(&script);
+                            window.set_title(&title);
                         }
                         sync_tabs_to_js(&toolbar_webview, &tab_store);
                     }
